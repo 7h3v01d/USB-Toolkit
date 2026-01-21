@@ -1,4 +1,4 @@
-<Project Name> <Version>
+USB Toolkit: WhatsUSB & Handshake Capture (aka WhatsUSB)
 Private Evaluation & Testing License (PETL) v1.0
 
 CANONICAL TEXT
