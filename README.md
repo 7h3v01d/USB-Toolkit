@@ -5,22 +5,6 @@ The USB Toolkit is a modular set of tools found in the archives that simplifies 
 
 ---
 
-⚠️ **LICENSE & USAGE NOTICE — READ FIRST**
-
-This repository is **source-available for private technical evaluation and testing only**.
-
-- ❌ No commercial use  
-- ❌ No production use  
-- ❌ No academic, institutional, or government use  
-- ❌ No research, benchmarking, or publication  
-- ❌ No redistribution, sublicensing, or derivative works  
-- ❌ No independent development based on this code  
-
-All rights remain exclusively with the author.  
-Use of this software constitutes acceptance of the terms defined in **LICENSE.txt**.
-
----
-
 ## Key Features
 
 - WhatsUSB - Detailed Device Inspector:
