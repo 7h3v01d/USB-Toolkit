@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "usb-toolkit"
+version = "1.0.0"
+description = "USB descriptor inspector and handshake-capture monitor with a chain-hashed audit log."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Leon Priest" }]
+license = { text = "PETL-1.0" }
+dependencies = [
+    "PyQt6>=6.6",
+    "pyusb>=1.2",
+    "psutil>=5.9",
+]
+
+[project.scripts]
+usb-toolkit = "usb_toolkit.app:main"
+
+[project.gui-scripts]
+usb-toolkit-gui = "usb_toolkit.app:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,2 +1,3 @@
-pyusb 
-psutil
+PyQt6>=6.6
+pyusb>=1.2
+psutil>=5.9
