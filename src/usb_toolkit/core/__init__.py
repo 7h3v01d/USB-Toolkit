@@ -16,6 +16,8 @@ from .ids import UsbIdDatabase, DEFAULT_DB
 from .libusb_deploy import DeployResult, PeInfo, deploy, parse_pe
 from .baseline import BaselineDiff, BaselineStore, ChangedDevice, diff_against_baseline, stable_key
 from .heuristics import Finding, Severity, scan_all, scan_device, worst_severity
+from .names import NameResolver, ResolvedName
+from .win_names import PnpName, parse_instance_id, pnp_device_names
 from . import serialize
 
 __all__ = [
@@ -52,4 +54,9 @@ __all__ = [
     "scan_device",
     "worst_severity",
     "serialize",
+    "NameResolver",
+    "ResolvedName",
+    "PnpName",
+    "parse_instance_id",
+    "pnp_device_names",
 ]

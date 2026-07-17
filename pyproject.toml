@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "usb-toolkit"
-version = "1.0.0"
+version = "1.1.0"
 description = "USB descriptor inspector and handshake-capture monitor with a chain-hashed audit log."
 readme = "README.md"
 requires-python = ">=3.11"

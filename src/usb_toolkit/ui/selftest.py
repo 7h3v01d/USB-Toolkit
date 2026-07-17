@@ -56,7 +56,13 @@ class SelfTestView(QWidget):
 
     @pyqtSlot()
     def run_test(self) -> None:
+        import usb_toolkit
+        from pathlib import Path as _P
         lines: list[str] = []
+        lines.append(f"[    ] USB Toolkit v{usb_toolkit.__version__}")
+        lines.append(f"       running from: {_P(usb_toolkit.__file__).parent}")
+        lines.append("       (if this path or version surprises you, delete .venv and re-run setup.bat)")
+        lines.append("")
 
         dr = self._deploy_result
         if dr is not None:
@@ -84,6 +90,22 @@ class SelfTestView(QWidget):
             vendor = self._ids.vendor(dev.vendor_id) or dev.manufacturer or "?"
             lines.append(f"       {dev.vid_pid}  {vendor}")
         lines.append("")
+
+        try:
+            from ..core.win_names import pnp_device_names
+            import platform
+            if platform.system() == "Windows":
+                count = len(pnp_device_names())
+                mark = "OK  " if count else "----"
+                lines.append(f"[{mark}] Windows PnP names: {count} entr{'y' if count == 1 else 'ies'}")
+                if not count:
+                    lines.append("       SetupAPI returned nothing — names fall back to usb.ids/category")
+            else:
+                lines.append("[----] Windows PnP names: n/a on this platform")
+            lines.append("")
+        except Exception as exc:
+            lines.append(f"[----] Windows PnP names: query failed ({exc})")
+            lines.append("")
 
         if self._ids.available:
             lines.append("[OK  ] usb.ids database loaded")

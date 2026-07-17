@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.backend import UsbBackend
 from ..core.ids import UsbIdDatabase
+from ..core.names import NameResolver
 from .inspector import InspectorView
 from .monitor_view import MonitorView
 from .posture import PostureView
@@ -27,7 +28,7 @@ from .selftest import SelfTestView
 from . import theme
 
 APP_NAME = "USB Toolkit"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 
 class MainWindow(QMainWindow):
@@ -40,11 +41,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
         self.resize(1040, 680)
 
+        self._resolver = NameResolver(ids)
+
         tabs = QTabWidget()
-        self._inspector = InspectorView(backend, ids)
-        self._monitor = MonitorView(backend, ids, log_path)
+        self._inspector = InspectorView(backend, ids, self._resolver)
+        self._monitor = MonitorView(backend, ids, log_path, self._resolver)
         self._selftest = SelfTestView(backend, ids, deploy_result=deploy_result)
-        self._posture = PostureView(backend, ids, log_path.parent / "baselines")
+        self._posture = PostureView(backend, ids, log_path.parent / "baselines", self._resolver)
 
         # Keep the inspector in sync with live monitor snapshots.
         self._monitor.snapshot.connect(self._inspector.set_devices)

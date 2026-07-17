@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -26,6 +26,7 @@ from ..core.audit import AuditLog
 from ..core.backend import UsbBackend
 from ..core.events import DeviceEvent, EventKind
 from ..core.ids import UsbIdDatabase
+from ..core.names import NameResolver
 from ..core.models import UsbDevice
 from ..monitor import MonitorWorker
 from . import theme
@@ -34,10 +35,18 @@ from . import theme
 class MonitorView(QWidget):
     snapshot = pyqtSignal(list)  # forwards live snapshots to the inspector
 
-    def __init__(self, backend: UsbBackend, ids: UsbIdDatabase, log_path: Path, parent=None) -> None:
+    def __init__(
+        self,
+        backend: UsbBackend,
+        ids: UsbIdDatabase,
+        log_path: Path,
+        resolver: NameResolver,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._backend = backend
         self._ids = ids
+        self._resolver = resolver
         self._log = AuditLog(log_path)
         self._worker: MonitorWorker | None = None
         self._build()
@@ -111,17 +120,17 @@ class MonitorView(QWidget):
     @pyqtSlot(object)
     def _on_event(self, event: DeviceEvent) -> None:
         dev: UsbDevice = event.device
-        name = (
-            self._ids.product(dev.vendor_id, dev.product_id)
-            or dev.product
-            or dev.manufacturer
-            or "Unknown"
-        )
+        # A device that just enumerated may only now have a PnP name — refresh
+        # the cache so the freshest Windows-side name is available.
+        self._resolver.refresh_pnp()
+        resolved = self._resolver.resolve(dev)
+        name = resolved.name
         payload = {
             "kind": event.kind.value,
             "timestamp": event.timestamp,
             "vid_pid": dev.vid_pid,
             "product": name,
+            "name_source": resolved.source,
             "serial": dev.serial,
             "bus": dev.bus,
             "address": dev.address,
@@ -138,6 +147,37 @@ class MonitorView(QWidget):
                 item.setForeground(color)
             self._table.setItem(row, col, item)
         self._table.scrollToBottom()
+
+        # Race fix: at the instant of connection Windows may not have finished
+        # naming the device, and its string descriptors may not be readable
+        # yet. If the name came from a weak layer, take a second look shortly
+        # after — same treatment the Inspector effectively gets by being
+        # opened later.
+        if event.kind == EventKind.CONNECTED and resolved.source in (
+            "category", "vid_pid", "vendor+category"
+        ):
+            QTimer.singleShot(
+                2500, lambda r=row, d=dev: self._reresolve_row(r, d)
+            )
+
+    def _reresolve_row(self, row: int, dev: UsbDevice) -> None:
+        """Second-chance naming for a captured connect event (GUI thread)."""
+        if row >= self._table.rowCount():
+            return
+        self._resolver.refresh_pnp()
+        # Prefer the device's CURRENT descriptors — strings often become
+        # readable a moment after enumeration completes.
+        fresh = dev
+        for candidate in self._backend.enumerate():
+            if candidate.identity == dev.identity:
+                fresh = candidate
+                break
+        resolved = self._resolver.resolve(fresh)
+        item = self._table.item(row, 2)
+        if item is not None and resolved.name != item.text() and resolved.source not in (
+            "category", "vid_pid"
+        ):
+            item.setText(resolved.name)
 
     @pyqtSlot(str)
     def _on_error(self, message: str) -> None:

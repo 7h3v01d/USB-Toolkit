@@ -54,6 +54,8 @@ src/usb_toolkit/
 │   ├── audit.py          # chain-hashed JSONL log + verify()
 │   ├── ids.py            # usb.ids vendor/product resolver
 │   ├── libusb_deploy.py  # PE-validated DLL staging from assets/
+│   ├── names.py          # layered NameResolver (usb.ids → PnP → strings...)
+│   ├── win_names.py      # Windows PnP names via ctypes SetupAPI (read-only)
 │   ├── serialize.py      # device <-> JSON/CSV, exact round-trip
 │   ├── baseline.py       # named snapshots + drift diff (stable identity)
 │   └── heuristics.py     # R1-R7 rogue-device findings, severity-ranked
@@ -85,8 +87,13 @@ src/usb_toolkit/
 
 ```
 setup.bat      :: creates .venv and installs the package
-run.bat        :: launches the GUI (also self-heals the venv on first run)
+run.bat        :: launches the GUI (refreshes the install every launch, so
+               :: the venv can never run stale code after an update)
 ```
+
+The Self-Test tab's first lines show the running version and the exact source
+path in use — if either surprises you after an update, delete `.venv` and
+re-run `setup.bat`.
 
 Or manually, from the project root:
 
@@ -124,6 +131,19 @@ demo device set — the app always launches.
 On Linux/macOS: `sudo apt install libusb-1.0-0` / `brew install libusb`.
 Some descriptors require admin/sudo to read.
 
+### Device naming
+
+libusb on Windows usually can't open devices already claimed by a native
+driver (HID, storage, ...), so string descriptors are often unreadable and
+naive tools show "Unknown". USB Toolkit resolves every device through a
+layered ladder — usb.ids product name → **Windows PnP friendly name** (the
+same source Device Manager uses, read via SetupAPI with pure ctypes, no
+device is ever opened) → descriptor strings → vendor + category → category →
+VID:PID. "Unknown" is no longer a possible output; the Inspector shows which
+layer named each device, and the Self-Test tab reports how many PnP names
+were found. The PnP cache refreshes automatically when the Monitor sees a
+new connection, so freshly-plugged devices pick up their Windows-side name.
+
 ---
 
 ## The audit log
@@ -149,12 +169,13 @@ replace.
 python -m pytest -q
 ```
 
-66 tests covering decode correctness (the fixed bugs are pinned as regression
+85 tests covering decode correctness (the fixed bugs are pinned as regression
 tests), the event diff engine, the audit chain including tamper and deletion
 detection, the usb.ids parser, backend behaviour, headless UI construction, and the libusb deployer
 (forged minimal PE files exercise arch matching and every refusal path),
 serialization round-trips, baseline drift detection (including the added-HID
-reflash scenario), and every heuristic rule's fire and no-fire conditions.
+reflash scenario), every heuristic rule's fire and no-fire conditions, and the
+name-resolution ladder (PnP instance-ID parsing plus each fallthrough layer).
 The suite runs entirely against the mock backend — validate on real hardware
 by plugging devices with the Monitor running.
 

@@ -31,6 +31,7 @@ from ..core.backend import UsbBackend
 from ..core.baseline import BaselineStore, diff_against_baseline
 from ..core.heuristics import Severity
 from ..core.ids import UsbIdDatabase
+from ..core.names import NameResolver
 from ..core.models import UsbDevice
 from . import theme
 
@@ -48,11 +49,13 @@ class PostureView(QWidget):
         backend: UsbBackend,
         ids: UsbIdDatabase,
         baseline_dir: Path,
+        resolver: NameResolver,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self._backend = backend
         self._ids = ids
+        self._resolver = resolver
         self._store = BaselineStore(baseline_dir)
         self._devices: list[UsbDevice] = []
         self._build()
@@ -129,11 +132,7 @@ class PostureView(QWidget):
         red = amber = 0
         for dev in self._devices:
             found = heuristics.scan_device(dev, self._ids)
-            name = (
-                self._ids.product(dev.vendor_id, dev.product_id)
-                or dev.product
-                or "Unknown"
-            )
+            name = self._resolver.resolve(dev).name
             worst = heuristics.worst_severity(found)
             node = QTreeWidgetItem(
                 self._findings,
@@ -218,14 +217,14 @@ class PostureView(QWidget):
         for dev in result.added:
             item = QTreeWidgetItem(
                 self._diff,
-                [f"ADDED  {dev.product or 'Unknown'} [{dev.vid_pid}]",
+                [f"ADDED  {self._resolver.resolve(dev).name} [{dev.vid_pid}]",
                  f"serial {dev.serial or '—'}"],
             )
             item.setForeground(0, QColor(theme.AMBER))
         for dev in result.removed:
             item = QTreeWidgetItem(
                 self._diff,
-                [f"REMOVED  {dev.product or 'Unknown'} [{dev.vid_pid}]",
+                [f"REMOVED  {self._resolver.resolve(dev).name} [{dev.vid_pid}]",
                  f"serial {dev.serial or '—'}"],
             )
             item.setForeground(0, QColor(theme.TEXT_DIM))
@@ -233,7 +232,7 @@ class PostureView(QWidget):
             dev = change.device
             item = QTreeWidgetItem(
                 self._diff,
-                [f"CHANGED  {dev.product or 'Unknown'} [{dev.vid_pid}]",
+                [f"CHANGED  {self._resolver.resolve(dev).name} [{dev.vid_pid}]",
                  "descriptor drift — expand"],
             )
             item.setForeground(0, QColor(theme.RED))

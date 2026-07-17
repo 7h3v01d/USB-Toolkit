@@ -92,8 +92,10 @@ def test_main_window_builds(qapp, tmp_path):
 
 def test_inspector_populates(qapp):
     from usb_toolkit.ui.inspector import InspectorView
+    from usb_toolkit.core.names import NameResolver
     be = MockBackend(demo_devices())
-    view = InspectorView(be, UsbIdDatabase())
+    ids = UsbIdDatabase()
+    view = InspectorView(be, ids, NameResolver(ids, pnp_provider=lambda: {}))
     assert view._list.count() == 2
 
 

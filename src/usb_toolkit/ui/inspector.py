@@ -28,25 +28,29 @@ from ..core import decode, heuristics
 from ..core.backend import UsbBackend
 from ..core.heuristics import Severity
 from ..core.ids import UsbIdDatabase
+from ..core.names import NameResolver
 from ..core.models import UsbDevice
 from . import theme
 
 _SEV_MARK = {Severity.RED: "[!!] ", Severity.AMBER: "[!]  ", Severity.INFO: ""}
 
 
-def _list_label(dev: UsbDevice, ids: UsbIdDatabase) -> str:
-    vendor = ids.vendor(dev.vendor_id) or dev.manufacturer or "Unknown vendor"
-    product = ids.product(dev.vendor_id, dev.product_id) or dev.product or dev.vid_pid
+def _list_label(dev: UsbDevice, ids: UsbIdDatabase, resolver: NameResolver) -> str:
+    resolved = resolver.resolve(dev)
+    vendor = resolved.vendor or "Unknown vendor"
     worst = heuristics.worst_severity(heuristics.scan_device(dev, ids))
     mark = _SEV_MARK.get(worst, "") if worst is not None else ""
-    return f"{mark}{vendor}\n  {product}  [{dev.vid_pid}]"
+    return f"{mark}{vendor}\n  {resolved.name}  [{dev.vid_pid}]"
 
 
 class InspectorView(QWidget):
-    def __init__(self, backend: UsbBackend, ids: UsbIdDatabase, parent=None) -> None:
+    def __init__(
+        self, backend: UsbBackend, ids: UsbIdDatabase, resolver: NameResolver, parent=None
+    ) -> None:
         super().__init__(parent)
         self._backend = backend
         self._ids = ids
+        self._resolver = resolver
         self._devices: list[UsbDevice] = []
         self._build()
         self.refresh()
@@ -92,7 +96,7 @@ class InspectorView(QWidget):
         self._devices = self._backend.enumerate()
         self._list.clear()
         for dev in self._devices:
-            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids)))
+            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids, self._resolver)))
         self._count.setText(f"{len(self._devices)} device(s)")
         if self._devices:
             self._list.setCurrentRow(0)
@@ -108,7 +112,7 @@ class InspectorView(QWidget):
     def refresh_from_cache(self, keep_row: int = 0) -> None:
         self._list.clear()
         for dev in self._devices:
-            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids)))
+            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids, self._resolver)))
         self._count.setText(f"{len(self._devices)} device(s)")
         if 0 <= keep_row < len(self._devices):
             self._list.setCurrentRow(keep_row)
@@ -124,13 +128,15 @@ class InspectorView(QWidget):
         vendor = self._ids.vendor(dev.vendor_id)
         product = self._ids.product(dev.vendor_id, dev.product_id)
 
+        resolved = self._resolver.resolve(dev)
         ident = self._section("Identity")
+        self._row(ident, "Name", f"{resolved.name}  (via {resolved.source})")
         self._row(ident, "VID:PID", dev.vid_pid)
         self._row(ident, "Vendor (usb.ids)", vendor or "—")
         self._row(ident, "Product (usb.ids)", product or "—")
-        self._row(ident, "Manufacturer", dev.manufacturer or "Unknown")
-        self._row(ident, "Product string", dev.product or "Unknown")
-        self._row(ident, "Serial", dev.serial or "Unknown")
+        self._row(ident, "Manufacturer string", dev.manufacturer or "— (unreadable)")
+        self._row(ident, "Product string", dev.product or "— (unreadable)")
+        self._row(ident, "Serial", dev.serial or "— (unreadable or absent)")
 
         link = self._section("Link")
         self._row(link, "Category", decode.device_category(dev))
