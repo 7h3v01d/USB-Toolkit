@@ -98,10 +98,16 @@ python -m venv .venv
 
 ### libusb backend — automatic deployment
 
-pyusb needs a libusb backend to talk to the bus. On Windows the app stages it
-for you at startup: drop `libusb-1.0.dll` into `assets/` — either **loose** or
-**inside a `.zip`** (an official libusb release zip works as-is; the build
-matching your interpreter's architecture is selected automatically).
+pyusb needs a libusb backend to talk to the bus. **`assets/libusb-1.0.zip`
+ships in this repo** — libusb v1.0.29 official MinGW builds (statically
+linked, no MSVC runtime needed) for x64, x86, and arm64, each PE-verified at
+packaging time (SHA-256 manifest in the zip's `SOURCE.txt`). On Windows the
+app stages the build matching your interpreter's architecture at startup;
+nothing to do.
+
+To use a different build, drop your own `libusb-1.0.dll` into `assets/` —
+either **loose** or **inside a `.zip`** (an official libusb release zip works
+as-is). A loose DLL takes priority over zips.
 
 The deployer is deny-first: every candidate is parsed as a PE file and must be
 a genuine DLL of the correct architecture (x86 / x64 / arm64 — matched to the
@@ -112,9 +118,8 @@ handed to pyusb by explicit path; `PATH` is never touched. If deployment
 fails, the backend falls through to a system libusb, and failing that, the
 demo device set — the app always launches.
 
-> **Note:** `.rar` archives can't be read (no stdlib support). If you have
-> `libusb-1.0.rar`, re-pack it as a `.zip` or extract the DLL loose into
-> `assets/`. The Self-Test tab will remind you if it spots one.
+> **Note:** `.rar` archives can't be read (no stdlib support); the Self-Test
+> tab will flag one if it spots it in `assets/`.
 
 On Linux/macOS: `sudo apt install libusb-1.0-0` / `brew install libusb`.
 Some descriptors require admin/sudo to read.
