@@ -8,6 +8,10 @@ Copyright 2026 Leon Priest (7h3v01d). Private Evaluation & Testing License
 
 ---
 
+<img width="1920" height="1040" alt="screenshot" src="https://github.com/user-attachments/assets/38644494-99f2-48f0-94e7-dbb5b8a8d97e" />
+
+---
+
 ## What it does
 
 Three loose scripts, unified into one app with a shared, correct core:
