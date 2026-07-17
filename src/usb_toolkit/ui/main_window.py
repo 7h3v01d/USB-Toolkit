@@ -22,6 +22,7 @@ from ..core.backend import UsbBackend
 from ..core.ids import UsbIdDatabase
 from .inspector import InspectorView
 from .monitor_view import MonitorView
+from .posture import PostureView
 from .selftest import SelfTestView
 from . import theme
 
@@ -30,7 +31,9 @@ APP_VERSION = "1.0.0"
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, backend: UsbBackend, ids: UsbIdDatabase, log_path: Path) -> None:
+    def __init__(
+        self, backend: UsbBackend, ids: UsbIdDatabase, log_path: Path, deploy_result=None
+    ) -> None:
         super().__init__()
         self._backend = backend
         self._ids = ids
@@ -40,13 +43,15 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         self._inspector = InspectorView(backend, ids)
         self._monitor = MonitorView(backend, ids, log_path)
-        self._selftest = SelfTestView(backend, ids)
+        self._selftest = SelfTestView(backend, ids, deploy_result=deploy_result)
+        self._posture = PostureView(backend, ids, log_path.parent / "baselines")
 
         # Keep the inspector in sync with live monitor snapshots.
         self._monitor.snapshot.connect(self._inspector.set_devices)
 
         tabs.addTab(self._inspector, "Inspector")
         tabs.addTab(self._monitor, "Monitor")
+        tabs.addTab(self._posture, "Posture")
         tabs.addTab(self._selftest, "Self-Test")
         tabs.addTab(self._about(), "About")
         self.setCentralWidget(tabs)
@@ -65,7 +70,7 @@ class MainWindow(QMainWindow):
         body = QLabel(
             "Descriptor inspector and handshake-capture monitor for the USB bus.\n\n"
             "Inspector — decode any device's descriptors into human-readable form.\n"
-            "Monitor  — record every connect/disconnect to a chain-hashed audit log.\n"
+            "Monitor  — record every connect/disconnect to a chain-hashed audit log.\nPosture  — heuristic rogue-device flags, baselines, and drift detection.\n"
             "Self-Test — confirm the pyusb + libusb backend is wired up.\n\n"
             "Copyright 2026 Leon Priest (7h3v01d).\n"
             "Private Evaluation & Testing License (PETL) v1.0 — see LICENSE.txt."

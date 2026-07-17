@@ -67,11 +67,17 @@ class MockBackend(UsbBackend):
 
 
 class PyusbBackend(UsbBackend):
-    """Real backend over pyusb + libusb."""
+    """Real backend over pyusb + libusb.
 
-    def __init__(self) -> None:
+    When ``dll_path`` is supplied (a staged, PE-validated libusb-1.0.dll), it
+    is handed to pyusb by explicit path via ``find_library`` — PATH is never
+    consulted or mutated for it.
+    """
+
+    def __init__(self, dll_path=None) -> None:
         self._usb = None
         self._util = None
+        self._dll_path = str(dll_path) if dll_path else None
         self._import_error: Optional[str] = None
         try:
             import usb.core as _core  # noqa: WPS433 (deliberate late import)
@@ -82,17 +88,27 @@ class PyusbBackend(UsbBackend):
         except Exception as exc:  # ImportError or backend init failure
             self._import_error = str(exc)
 
+    def _libusb_backend(self):
+        """Build the libusb1 backend, preferring the staged DLL. Never raises."""
+        try:
+            import usb.backend.libusb1 as libusb1
+
+            if self._dll_path:
+                backend = libusb1.get_backend(find_library=lambda _name: self._dll_path)
+                if backend is not None:
+                    return backend, "staged libusb-1.0.dll"
+            backend = libusb1.get_backend()
+            if backend is not None:
+                return backend, "system libusb-1.0"
+        except Exception:
+            pass
+        return None, "no libusb backend"
+
     def probe(self) -> ProbeResult:
         if self._usb is None:
             return ProbeResult(False, "PyusbBackend", f"pyusb unavailable: {self._import_error}")
         try:
-            backend = None
-            try:
-                import usb.backend.libusb1 as libusb1
-
-                backend = libusb1.get_backend()
-            except Exception:
-                backend = None
+            backend, backend_label = self._libusb_backend()
             found = self._usb.find(find_all=True, backend=backend)
             count = sum(1 for _ in found) if found is not None else 0
             if backend is None:
@@ -101,7 +117,7 @@ class PyusbBackend(UsbBackend):
                     "PyusbBackend",
                     f"default backend, {count} device(s) — install libusb-1.0 for full access",
                 )
-            return ProbeResult(True, "PyusbBackend", f"libusb-1.0 backend, {count} device(s)")
+            return ProbeResult(True, "PyusbBackend", f"{backend_label}, {count} device(s)")
         except Exception as exc:
             return ProbeResult(False, "PyusbBackend", f"bus error: {exc}")
 
@@ -109,7 +125,8 @@ class PyusbBackend(UsbBackend):
         if self._usb is None:
             return []
         try:
-            raw = self._usb.find(find_all=True)
+            backend, _ = self._libusb_backend()
+            raw = self._usb.find(find_all=True, backend=backend)
             if raw is None:
                 return []
             return [self._to_model(dev) for dev in raw]
@@ -187,9 +204,16 @@ class PyusbBackend(UsbBackend):
         )
 
 
-def default_backend() -> UsbBackend:
-    """Return the real backend if pyusb imports, else a mock so the GUI still runs."""
-    backend = PyusbBackend()
+def default_backend(deploy_result=None) -> UsbBackend:
+    """Return the real backend if pyusb imports, else a mock so the GUI still runs.
+
+    ``deploy_result`` is an optional libusb_deploy.DeployResult; when it
+    succeeded, its staged DLL path is handed to the backend.
+    """
+    dll_path = None
+    if deploy_result is not None and getattr(deploy_result, "ok", False):
+        dll_path = deploy_result.dll_path
+    backend = PyusbBackend(dll_path=dll_path)
     if backend._usb is None:  # noqa: SLF001 (module-internal factory)
         return MockBackend(demo_devices())
     return backend

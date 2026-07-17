@@ -24,11 +24,22 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core import decode
+from ..core import decode, heuristics
 from ..core.backend import UsbBackend
+from ..core.heuristics import Severity
 from ..core.ids import UsbIdDatabase
 from ..core.models import UsbDevice
 from . import theme
+
+_SEV_MARK = {Severity.RED: "[!!] ", Severity.AMBER: "[!]  ", Severity.INFO: ""}
+
+
+def _list_label(dev: UsbDevice, ids: UsbIdDatabase) -> str:
+    vendor = ids.vendor(dev.vendor_id) or dev.manufacturer or "Unknown vendor"
+    product = ids.product(dev.vendor_id, dev.product_id) or dev.product or dev.vid_pid
+    worst = heuristics.worst_severity(heuristics.scan_device(dev, ids))
+    mark = _SEV_MARK.get(worst, "") if worst is not None else ""
+    return f"{mark}{vendor}\n  {product}  [{dev.vid_pid}]"
 
 
 class InspectorView(QWidget):
@@ -81,10 +92,7 @@ class InspectorView(QWidget):
         self._devices = self._backend.enumerate()
         self._list.clear()
         for dev in self._devices:
-            vendor = self._ids.vendor(dev.vendor_id) or dev.manufacturer or "Unknown vendor"
-            product = self._ids.product(dev.vendor_id, dev.product_id) or dev.product or dev.vid_pid
-            item = QListWidgetItem(f"{vendor}\n  {product}  [{dev.vid_pid}]")
-            self._list.addItem(item)
+            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids)))
         self._count.setText(f"{len(self._devices)} device(s)")
         if self._devices:
             self._list.setCurrentRow(0)
@@ -100,9 +108,7 @@ class InspectorView(QWidget):
     def refresh_from_cache(self, keep_row: int = 0) -> None:
         self._list.clear()
         for dev in self._devices:
-            vendor = self._ids.vendor(dev.vendor_id) or dev.manufacturer or "Unknown vendor"
-            product = self._ids.product(dev.vendor_id, dev.product_id) or dev.product or dev.vid_pid
-            self._list.addItem(QListWidgetItem(f"{vendor}\n  {product}  [{dev.vid_pid}]"))
+            self._list.addItem(QListWidgetItem(_list_label(dev, self._ids)))
         self._count.setText(f"{len(self._devices)} device(s)")
         if 0 <= keep_row < len(self._devices):
             self._list.setCurrentRow(keep_row)

@@ -19,6 +19,15 @@ Three loose scripts, unified into one app with a shared, correct core:
 - **Monitor** — a background poller that detects every connect *and* disconnect
   and writes each one to an append-only, tamper-evident audit log. Live events
   stream into a table as they happen.
+- **Posture** — a security pass over the bus. Heuristic flags for rogue-device
+  tells (storage+HID composites — the BadUSB signature — VID 0x0000, missing
+  serials on storage, unregistered vendors, over-budget power draw), plus
+  named **baseline snapshots** with drift detection: diff any later scan
+  against a baseline to see what appeared, vanished, or *changed descriptors*
+  (same VID:PID:serial, different interface layout = firmware-reflash tell).
+  Inventory exports to JSON and CSV. Flagged devices are marked `[!!]` / `[!]`
+  in the Inspector list too. Findings are heuristics, not verdicts — they say
+  "verify this", never "this is malicious".
 - **Self-Test** — confirms the pyusb + libusb backend is present and can
   enumerate the bus, and reports what `usb.ids` resolved.
 
@@ -43,11 +52,16 @@ src/usb_toolkit/
 │   ├── backend.py        # UsbBackend + PyusbBackend + MockBackend
 │   ├── events.py         # snapshot diff -> connect/disconnect events
 │   ├── audit.py          # chain-hashed JSONL log + verify()
-│   └── ids.py            # usb.ids vendor/product resolver
+│   ├── ids.py            # usb.ids vendor/product resolver
+│   ├── libusb_deploy.py  # PE-validated DLL staging from assets/
+│   ├── serialize.py      # device <-> JSON/CSV, exact round-trip
+│   ├── baseline.py       # named snapshots + drift diff (stable identity)
+│   └── heuristics.py     # R1-R7 rogue-device findings, severity-ranked
 └── ui/
     ├── theme.py          # obsidian / teal / phosphor QSS
     ├── inspector.py      ├── monitor_view.py
-    ├── selftest.py       └── main_window.py
+    ├── posture.py        ├── selftest.py
+    └── main_window.py
 ```
 
 ---
@@ -82,11 +96,27 @@ python -m venv .venv
 .venv\Scripts\python -m usb_toolkit
 ```
 
-### libusb backend
+### libusb backend — automatic deployment
 
-pyusb needs a libusb backend to talk to the bus. On Windows, install
-`libusb-1.0.dll` (a copy is in `assets/libusb-1.0.rar`) or bind a device with
-Zadig. On Linux/macOS: `sudo apt install libusb-1.0-0` / `brew install libusb`.
+pyusb needs a libusb backend to talk to the bus. On Windows the app stages it
+for you at startup: drop `libusb-1.0.dll` into `assets/` — either **loose** or
+**inside a `.zip`** (an official libusb release zip works as-is; the build
+matching your interpreter's architecture is selected automatically).
+
+The deployer is deny-first: every candidate is parsed as a PE file and must be
+a genuine DLL of the correct architecture (x86 / x64 / arm64 — matched to the
+*Python process*, not the OS) or it is refused with a reason shown in the
+Self-Test tab. The validated DLL is copied atomically to
+`~/.usb_toolkit/bin/` (idempotent — unchanged files aren't rewritten) and
+handed to pyusb by explicit path; `PATH` is never touched. If deployment
+fails, the backend falls through to a system libusb, and failing that, the
+demo device set — the app always launches.
+
+> **Note:** `.rar` archives can't be read (no stdlib support). If you have
+> `libusb-1.0.rar`, re-pack it as a `.zip` or extract the DLL loose into
+> `assets/`. The Self-Test tab will remind you if it spots one.
+
+On Linux/macOS: `sudo apt install libusb-1.0-0` / `brew install libusb`.
 Some descriptors require admin/sudo to read.
 
 ---
@@ -114,9 +144,12 @@ replace.
 python -m pytest -q
 ```
 
-29 tests covering decode correctness (the fixed bugs are pinned as regression
+66 tests covering decode correctness (the fixed bugs are pinned as regression
 tests), the event diff engine, the audit chain including tamper and deletion
-detection, the usb.ids parser, backend behaviour, and headless UI construction.
+detection, the usb.ids parser, backend behaviour, headless UI construction, and the libusb deployer
+(forged minimal PE files exercise arch matching and every refusal path),
+serialization round-trips, baseline drift detection (including the added-HID
+reflash scenario), and every heuristic rule's fire and no-fire conditions.
 The suite runs entirely against the mock backend — validate on real hardware
 by plugging devices with the Monitor running.
 

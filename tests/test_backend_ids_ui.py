@@ -86,7 +86,7 @@ def test_main_window_builds(qapp, tmp_path):
     from usb_toolkit.ui.main_window import MainWindow
     be = MockBackend(demo_devices())
     win = MainWindow(be, UsbIdDatabase(), tmp_path / "log.jsonl")
-    assert win.centralWidget().count() == 4  # Inspector, Monitor, Self-Test, About
+    assert win.centralWidget().count() == 5  # Inspector, Monitor, Posture, Self-Test, About
     win.close()
 
 

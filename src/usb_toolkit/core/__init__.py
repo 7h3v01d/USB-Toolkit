@@ -13,6 +13,10 @@ from .backend import (
 from .events import DeviceEvent, EventKind, diff_snapshots
 from .audit import AuditLog, VerifyResult, GENESIS
 from .ids import UsbIdDatabase, DEFAULT_DB
+from .libusb_deploy import DeployResult, PeInfo, deploy, parse_pe
+from .baseline import BaselineDiff, BaselineStore, ChangedDevice, diff_against_baseline, stable_key
+from .heuristics import Finding, Severity, scan_all, scan_device, worst_severity
+from . import serialize
 
 __all__ = [
     "Configuration",
@@ -33,4 +37,19 @@ __all__ = [
     "GENESIS",
     "UsbIdDatabase",
     "DEFAULT_DB",
+    "DeployResult",
+    "PeInfo",
+    "deploy",
+    "parse_pe",
+    "BaselineDiff",
+    "BaselineStore",
+    "ChangedDevice",
+    "diff_against_baseline",
+    "stable_key",
+    "Finding",
+    "Severity",
+    "scan_all",
+    "scan_device",
+    "worst_severity",
+    "serialize",
 ]
